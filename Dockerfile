@@ -13,6 +13,9 @@ WORKDIR /app
 # TODO(step-4b): copy package.json and package-lock.json, then install deps.
 COPY app/package.json app/package-lock.json ./
 RUN npm ci --omit=dev
+# Security: express pins proxy-addr ~2.0.7 (CVE-2026-90711, fixed in 2.0.8). --no-save installs the
+# patched version into node_modules without touching package.json / package-lock.json in the repo.
+RUN npm install --no-save --omit=dev --no-audit --no-fund proxy-addr@2.0.8
 
 # TODO(step-4c): copy the rest of the app source into /app.
 COPY app/ .
@@ -23,6 +26,14 @@ COPY app/ .
 
 # TODO(step-4d): set the runtime base image (same tag as step-4a for consistency).
 FROM node:20.11-slim
+
+# Security: pull Debian security fixes for OS packages (libgnutls30, perl-base) on top of the pinned tag.
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Security: npm (bundles tar 6.2.0, CVE-2026-59873) and npx are not needed at runtime — the app starts with node.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 WORKDIR /app
 
